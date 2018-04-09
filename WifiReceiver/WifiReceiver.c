@@ -72,19 +72,19 @@ int main(void)
 		
 	while(1){
 		/* ================== ASSIGNATION DES MOTEURS ================== */
-		pwm_set_a(255);
-		pwm_set_b(255);
+	
 		if (aFlyMode == '1') {
-			//pwm_set_a(aValeurVerticale);
-			//pwm_set_b(0);
-			
+			pwm_set_a(aValeurVerticale);
+			pwm_set_b(0);
+			PORTB = 0b00011111;
 		}
 		else if (aFlyMode == '0') {
-			//pwm_set_b(aValeurVerticale);
+			pwm_set_b(aValeurVerticale);
+			PORTB = 0b00000000;
 			
 		}
-		//servo_set_a(aValeurHorizontale);
-		servo_set_a(255);
+		servo_set_a(aValeurHorizontale);
+		
 		/* ================== PROGRAMME PRINCIPAL ================== */
 			// Si le buffer de réception n'est plus vide
 		if(!uart_is_rx_buffer_empty()) {
@@ -120,6 +120,7 @@ int main(void)
 /* Initialiser l'aéroglisseur                                           */
 /************************************************************************/
 void initializeAirboat(){
+	uart_clean_rx_buffer();
 	OSCCAL = OSCCAL + 6; // Calibration de la fréquence du uC de l'aéroglisseur
 	DDRD = set_bit(DDRD, PD2); // pin 16 (PD2) = true (RST de l'ESP)
 	PORTD = clear_bit(PORTD, PD2);
@@ -144,7 +145,7 @@ void initializeAirboat(){
 	aValeurHorizontale = 128;
 	aValeurVerticale = 0;
 	aEtatReception = WAIT_OPEN_BRACKET;
-	PORTB = 0b00011111;
+	PORTB = 0b00000001;
 }	
 
 /************************************************************************/
@@ -152,7 +153,6 @@ void initializeAirboat(){
 /************************************************************************/
 void waitForOpenBrackets(){
 	if (aText == '[') {
-		
 		aEtatReception = READ_DATA;
 		aNbChar = 0;
 	}
@@ -173,7 +173,7 @@ void readData(){
 		/* Dernier caractère: Mode de pilotage */
 		}else if (aNbChar >= 6){
 			/* Mode de lancement */
-			if (aText == 'A'){
+			if (aText == 'L'){
 				aFlyMode = '1'; // LIFT MODE
 			/* Mode vitesse */
 			}else{
