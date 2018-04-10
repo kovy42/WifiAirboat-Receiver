@@ -76,11 +76,11 @@ int main(void)
 		if (aFlyMode == '1') {
 			pwm_set_a(aValeurVerticale);
 			pwm_set_b(0);
-			PORTB = 0b00011111;
+			
 		}
 		else if (aFlyMode == '0') {
 			pwm_set_b(aValeurVerticale);
-			PORTB = 0b00000000;
+			
 			
 		}
 		servo_set_a(aValeurHorizontale);
@@ -153,6 +153,7 @@ void initializeAirboat(){
 /************************************************************************/
 void waitForOpenBrackets(){
 	if (aText == '[') {
+		PORTB = 0b00000011;
 		aEtatReception = READ_DATA;
 		aNbChar = 0;
 	}
