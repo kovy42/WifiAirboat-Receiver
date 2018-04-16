@@ -38,16 +38,6 @@ void waitForOpenBrackets();
 void readData();
 void displayData();
 
-/* ==================== REMOTE VARIABLES ===================== */
-uint8_t mHorizontale;
-uint8_t mVerticale;
-uint8_t mLiftMemory;
-uint8_t mBatterie;
-bool mButtonState;
-bool mFlyMode;
-char mOutputText[16];
-bool mOldFlyState;
-void initializeRemote();
 
 int main(void)
 {
@@ -126,9 +116,9 @@ void initializeAirboat(){
 	PORTD = clear_bit(PORTD, PD2);
 	_delay_ms(500);
 	PORTD = set_bit(PORTD, PD2);
-	_delay_ms(5000);
+	_delay_ms(1000);
 	uart_put_string("AT+CIPMODE=1\r\n\0"); // Mode Passthrough
-	_delay_ms(250);
+	_delay_ms(2500);
 	uart_put_string("AT+CIPSTART=\"UDP\",\"0.0.0.0\",123,456\r\n\0"); // Établir la transmission UDP
 	
 	lcd_clear_display();
