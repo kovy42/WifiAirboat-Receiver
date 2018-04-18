@@ -37,7 +37,12 @@ void initializeAirboat();
 void waitForOpenBrackets();
 void readData();
 void displayData();
-
+bool firstLoop;
+uint8_t mBatterie;
+uint8_t loopCount;
+bool cutEngines;
+bool emergencyBrake;
+uint8_t tempStoredLift;
 
 int main(void)
 {
@@ -48,7 +53,6 @@ int main(void)
 	uart_init();
 	uart_clean_rx_buffer();
 	servo_init();
-	
 	SREG = set_bit(SREG, 7);
 	uart_set_baudrate(BAUDRATE_9600);
 	
@@ -62,22 +66,33 @@ int main(void)
 		
 	while(1){
 		/* ================== ASSIGNATION DES MOTEURS ================== */
-	
-		if (aFlyMode == '1') {
-			pwm_set_a(aValeurVerticale);
-			pwm_set_b(0);
+		if(!cutEngines){
+			if(emergencyBrake){
+				pwm_set_a(0);
+			}else{
+				if (aFlyMode == '1') {
+					pwm_set_a(aValeurVerticale);
+					pwm_set_b(0);
+					tempStoredLift = aValeurVerticale;
+				}
+				else if (aFlyMode == '0') {
+					pwm_set_b(aValeurVerticale);
+					if(aValeurHorizontale < 64 || aValeurHorizontale > 192){
+						pwm_set_a(42);
+					}else{
+						pwm_set_a(tempStoredLift);
+					}
+					
+					
+				}
+			}
 			
+			servo_set_a(aValeurHorizontale);
 		}
-		else if (aFlyMode == '0') {
-			pwm_set_b(aValeurVerticale);
-			
-			
-		}
-		servo_set_a(aValeurHorizontale);
 		
 		/* ================== PROGRAMME PRINCIPAL ================== */
 			// Si le buffer de réception n'est plus vide
-		if(!uart_is_rx_buffer_empty()) {
+		if(!uart_is_rx_buffer_empty() && firstLoop != 1) {
 			aText = uart_get_byte();
 			switch (aEtatReception) {
 				/* ================== Attente d'entrée de données ================== */
@@ -94,6 +109,27 @@ int main(void)
 			}
 			
 		
+		}
+		firstLoop = 0;
+		mBatterie = getRealBatteryTension(adc_read(PA3), 9);
+		if(mBatterie < 63){
+			if(mBatterie < 60){
+				cutEngines = 1;
+				if(loopCount < 100){
+					PORTB = set_bit(PORTB, 4);
+				}else{
+					PORTB = clear_bit(PORTB, 4);
+					if(loopCount == 600){
+						loopCount = 0;
+					}
+				}
+				loopCount++;
+			}
+			else{
+				cutEngines = 0;
+				PORTB = set_bit(PORTB,4);
+			}
+			
 		}
 	
 	}
@@ -114,7 +150,7 @@ void initializeAirboat(){
 	OSCCAL = OSCCAL + 6; // Calibration de la fréquence du uC de l'aéroglisseur
 	DDRD = set_bit(DDRD, PD2); // pin 16 (PD2) = true (RST de l'ESP)
 	PORTD = clear_bit(PORTD, PD2);
-	_delay_ms(500);
+	_delay_ms(1500);
 	PORTD = set_bit(PORTD, PD2);
 	_delay_ms(1000);
 	uart_put_string("AT+CIPMODE=1\r\n\0"); // Mode Passthrough
@@ -123,7 +159,7 @@ void initializeAirboat(){
 	
 	lcd_clear_display();
 	lcd_write_string("Connected. :)");
-	_delay_ms(500);
+	_delay_ms(1000);
 	lcd_clear_display();
 	DDRB = set_bit(DDRB,PB0);
 	DDRB = set_bit(DDRB,PB1);
@@ -134,8 +170,13 @@ void initializeAirboat(){
 	aFlyMode = '0';
 	aValeurHorizontale = 128;
 	aValeurVerticale = 0;
+	firstLoop = 1;
+	loopCount = 0;
+	cutEngines = 0;
 	aEtatReception = WAIT_OPEN_BRACKET;
-	PORTB = 0b00000001;
+	PORTB = set_bit(PORTB, 0);
+	emergencyBrake = 0;
+	tempStoredLift = 0;
 }	
 
 /************************************************************************/
@@ -143,7 +184,7 @@ void initializeAirboat(){
 /************************************************************************/
 void waitForOpenBrackets(){
 	if (aText == '[') {
-		PORTB = 0b00000011;
+		PORTB = set_bit(PORTB, 1);
 		aEtatReception = READ_DATA;
 		aNbChar = 0;
 	}
@@ -164,12 +205,18 @@ void readData(){
 		/* Dernier caractère: Mode de pilotage */
 		}else if (aNbChar >= 6){
 			/* Mode de lancement */
-			if (aText == 'L'){
-				aFlyMode = '1'; // LIFT MODE
-			/* Mode vitesse */
+			if(aText == 'B'){
+				emergencyBrake = 1;
 			}else{
-				aFlyMode = '0'; // SPEED MODE
-			}		
+				emergencyBrake = 0;
+				if (aText == 'L'){
+					aFlyMode = '1'; // LIFT MODE
+					/* Mode vitesse */
+					}else{
+					aFlyMode = '0'; // SPEED MODE
+				}
+			}
+			
 		}
 		/* Itérer la position dans le segment de données */
 		aNbChar++;
@@ -188,33 +235,30 @@ void displayData(){
 	// Initialisation du lcd
 	aHorizontale[3] = 0;
 	aVerticale[3] = 0;
-	uart_clean_rx_buffer();
-	lcd_clear_display();
-	
-	// Valeur horizontale
-	lcd_set_cursor_position(0, 0);
-	lcd_write_string("HOR : ");
-	lcd_write_string(aHorizontale);
-	
-	// Affichage du mode
-	lcd_set_cursor_position(11, 0);
-	if(aFlyMode == '1')
-	lcd_write_string("LIFT");
-	if(aFlyMode == '0')
-	lcd_write_string("SPEED");
-	
-	// Valeur verticale
-	lcd_set_cursor_position(0, 1);
-	lcd_write_string("VER : ");
-	lcd_write_string(aVerticale);
-	_delay_ms(100);
-	
+	uart_clean_rx_buffer();	
+	//_delay_ms(100);
 	aEtatReception = WAIT_OPEN_BRACKET;
 	aValeurHorizontale = string_to_uint(aHorizontale);
 	aValeurVerticale = string_to_uint(aVerticale);
 }
 
+/**************************************************************************/
+/* Returns the maximum value between 0 and 255 that the battery can output*/
+/**************************************************************************/
+uint8_t getMaxBatteryValue(uint8_t maxTension){
+	return  maxTension * 0.232558f / 3.3f * 255;
+}
 
+/************************************************************************/
+/* Returns the battery tension                                          */
+/************************************************************************/
+uint8_t getBatteryUsagePercentage(uint8_t adcValue, uint8_t maxTension, uint8_t minTension){
+	return (int)((((float)adcValue / (float)getMaxBatteryValue(maxTension) - ((float)minTension/(float)maxTension)) *100) /(100-(100*minTension/maxTension)) * 100) ;
+}
+
+uint8_t getRealBatteryTension(uint8_t adcValue, uint8_t maxTension){
+	return  (int)((float)adcValue * 10 / (float)getMaxBatteryValue(maxTension) * maxTension ) ; // Pour plus de précision, il affiche la valeur fois 100
+}
 
 
 void DelBattery(uint8_t battValue)
