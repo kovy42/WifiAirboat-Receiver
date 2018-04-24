@@ -12,7 +12,6 @@
 #include "driver.h"
 #include "uart.h"
 #include "fifo.h"
-#include "lcd.h"
 
 /* =========== Define the reception states ============= */
 #define WAIT_OPEN_BRACKET 1 // Wait for beginning of data transmission
@@ -116,7 +115,6 @@ int main(void)
 /* Initialize the airboat microcontroller                               */
 /************************************************************************/
 void initializeAirboat(){
-	lcd_init();
 	adc_init();
 	pwm_init(1,1);
 	uart_init();
@@ -133,10 +131,7 @@ void initializeAirboat(){
 	uart_put_string("AT+CIPMODE=1\r\n\0"); // Passthrough mode
 	_delay_ms(2500);
 	uart_put_string("AT+CIPSTART=\"UDP\",\"0.0.0.0\",123,456\r\n\0"); // Set the UDP transmission
-	lcd_clear_display();
-	lcd_write_string("Connected. :)");
 	_delay_ms(1000);
-	lcd_clear_display();
 	DDRB = set_bit(DDRB,PB0);
 	DDRB = set_bit(DDRB,PB1);
 	DDRB = set_bit(DDRB,PB2);
